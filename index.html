@@ -586,6 +586,28 @@
   .badge-critical { background: var(--fail-bg); color: var(--fail); }
   .badge-warning  { background: var(--warn-bg); color: var(--warn); }
   .badge-ok       { background: var(--pass-bg); color: var(--pass); }
+
+  /* Toggle switch */
+  .toggle-wrap { display:inline-flex; align-items:center; }
+  .toggle-track {
+    width: 44px; height: 24px;
+    background: var(--border);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-track.active { background: var(--pass); }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: left 0.2s;
+  }
+  .toggle-track.active .toggle-thumb { left: 23px; }
 </style>
 </head>
 <body>
@@ -717,6 +739,18 @@
         <p style="margin-top:12px; color:var(--ink-muted); font-size:0.88rem;">Analizando resultados microbiológicos...</p>
       </div>
       <div id="analysisResult" style="display:none"></div>
+      <div id="analysisToggleRow" style="display:none; margin-top:18px; padding-top:16px; border-top:1px solid var(--border); align-items:center; gap:14px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+          <div class="toggle-wrap">
+            <input type="checkbox" id="incluirAnalisis" checked style="display:none">
+            <div class="toggle-track" onclick="toggleAnalisis()">
+              <div class="toggle-thumb"></div>
+            </div>
+          </div>
+          <span style="font-size:0.88rem; font-weight:500; color:var(--ink)">Incluir este análisis en el informe PDF/HTML</span>
+        </label>
+        <span id="toggleStatus" style="font-size:0.78rem; color:var(--pass); font-family:'DM Mono',monospace; font-weight:500;">✓ Se incluirá en el informe</span>
+      </div>
     </div>
   </div>
 
@@ -768,10 +802,18 @@
       Aerobios mesófilos: varía según tipo de alimento | Coliformes totales: varía según categoría |
       E. coli: ausencia en la mayoría de categorías | S. aureus: ≤100 UFC/g en alimentos listos |
       B. cereus: ≤10³ UFC/g | Hongos y levaduras: varía según categoría.
-      <strong>APTO:</strong> dentro de límites | <strong>NO APTO:</strong> supera límites | <strong>N/D:</strong> no determinado
+      <strong>APTO:</strong> dentro de límites | <strong>No Cumple CME-CAA:</strong> supera los Criterios Microbiológicos Establecidos en el CAA | <strong>N/D:</strong> no determinado
     </div>
 
     <div class="report-signature-area" id="rptSignatures"></div>
+
+    <div id="rptAnalysisSection" style="display:none; margin-top:18px; padding-top:14px; border-top:2px solid #1a1a2e;">
+      <div style="font-family:'DM Serif Display',serif; font-size:1rem; color:#1a1a2e; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+        Análisis de Resultados
+        <span style="background:#1a1a2e; color:white; font-family:'DM Mono',monospace; font-size:0.6rem; padding:2px 8px; border-radius:20px; letter-spacing:0.06em;">DIAGNÓSTICO</span>
+      </div>
+      <div id="rptAnalysisContent" style="font-size:0.75rem;"></div>
+    </div>
 
     <div class="report-footer">
       <p id="rptFooterLeft">Documento generado por sistema automatizado</p>
@@ -981,7 +1023,7 @@ function renderTable(rows) {
   rows.forEach(r => {
     const st = overallStatus(r);
     const stLabel = st === 'pass' ? '<span class="chip chip-pass">APTO</span>'
-                  : st === 'fail' ? '<span class="chip chip-fail">NO APTO</span>'
+                  : st === 'fail' ? '<span class="chip chip-fail">No Cumple CME-CAA</span>'
                   : '<span class="chip chip-nd">N/D</span>';
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1067,7 +1109,7 @@ function buildReport() {
   filteredRows.forEach(r => {
     const st = overallStatus(r);
     const stChip = st === 'pass' ? '<span class="r-chip r-chip-pass">APTO</span>'
-                 : st === 'fail' ? '<span class="r-chip r-chip-fail">NO APTO</span>'
+                 : st === 'fail' ? '<span class="r-chip r-chip-fail" style="font-size:0.58rem; padding:2px 6px; letter-spacing:0">No Cumple CME-CAA</span>'
                  : '<span class="r-chip r-chip-nd">N/D</span>';
 
     tableHTML += `<tr>
@@ -1105,6 +1147,19 @@ function buildReport() {
                <div class="sig-block"><div class="sig-line"></div><div class="sig-label">Responsable técnico</div><div class="sig-name"></div></div>`;
   }
   document.getElementById('rptSignatures').innerHTML = sigHTML;
+
+  // Inject analysis section if toggle is ON and analysis was generated
+  const incluir = document.getElementById('incluirAnalisis');
+  const analysisResult = document.getElementById('analysisResult');
+  const rptAnalysis = document.getElementById('rptAnalysisSection');
+  const rptAnalysisContent = document.getElementById('rptAnalysisContent');
+
+  if (incluir && incluir.checked && analysisResult && analysisResult.innerHTML.trim()) {
+    rptAnalysisContent.innerHTML = analysisResult.innerHTML;
+    rptAnalysis.style.display = 'block';
+  } else {
+    rptAnalysis.style.display = 'none';
+  }
 
   document.getElementById('rptFooterLeft').textContent = labName + ' — Informe generado automáticamente';
   document.getElementById('rptFooterRight').textContent = repNum + ' · ' + today;
@@ -1161,6 +1216,17 @@ function generateReport(type) {
     .sig-name { font-size:0.8rem; font-weight:600; color:#1a1a2e; margin-top:2px; }
     .report-footer { margin-top:16px; padding-top:8px; border-top:1px solid #d8d4c8; display:flex; justify-content:space-between; }
     .report-footer p { font-size:0.6rem; color:#aaa; font-family:'DM Mono',monospace; }
+    .analysis-section { margin-bottom:14px; }
+    .analysis-section h3 { font-family:'DM Serif Display',serif; font-size:0.88rem; color:#1a1a2e; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #e8e4dc; }
+    .analysis-section p, .analysis-section li { font-size:0.72rem; color:#3d3d5c; line-height:1.55; margin-bottom:4px; }
+    .analysis-section ul { padding-left:16px; }
+    .action-item { background:#f0ede4; border:1px solid #d8d4c8; border-left:3px solid #c8392b; border-radius:4px; padding:7px 10px; margin-bottom:6px; font-size:0.7rem; color:#1a1a2e; line-height:1.45; }
+    .action-item.urgent { border-left-color:#c8392b; background:#fde8e6; }
+    .action-item.ok { border-left-color:#2d6a4f; background:#d8f3dc; }
+    .analysis-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:0.6rem; font-weight:600; }
+    .badge-critical { background:#fde8e6; color:#c8392b; }
+    .badge-warning  { background:#fef3e2; color:#b5620a; }
+    .badge-ok       { background:#d8f3dc; color:#2d6a4f; }
     @media print {
       body { margin:0; }
       .report-page { padding:10mm 12mm 14mm; }
@@ -1310,35 +1376,193 @@ Elaborá tu respuesta en formato HTML usando estas secciones:
 Usá lenguaje técnico pero claro. Incluí referencias al CAA cuando corresponda. Sé específico con los microorganismos encontrados.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const data = await response.json();
-    const text = data.content?.find(b => b.type === 'text')?.text || 'Sin respuesta.';
+    // Local analysis engine — no external API needed
+    const text = generateLocalAnalysis(filteredRows, total, pass, fail, nd, failsByParam, byEmpresa);
 
     loading.style.display = 'none';
     result.style.display = 'block';
     result.innerHTML = `
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border);">
         <span style="font-family:'DM Serif Display',serif; font-size:0.85rem; color:var(--ink-muted);">
-          Análisis generado por IA · ${total} muestras · ${new Date().toLocaleDateString('es-AR')}
+          Análisis automático · ${total} muestras · ${new Date().toLocaleDateString('es-AR')}
         </span>
       </div>
       ${text}
     `;
+    // Show toggle row and init state
+    const toggleRow = document.getElementById('analysisToggleRow');
+    toggleRow.style.display = 'flex';
+    const track = document.querySelector('.toggle-track');
+    track.classList.add('active'); // default: include
 
   } catch(err) {
     loading.style.display = 'none';
     result.style.display = 'block';
-    result.innerHTML = `<div class="action-item urgent">Error al conectar con la IA: ${err.message}</div>`;
+    result.innerHTML = `<div class="action-item urgent">Error en el análisis: ${err.message}</div>`;
   }
+}
+
+// ─── TOGGLE ANÁLISIS ─────────────────────────────────────────────────────────
+function toggleAnalisis() {
+  const track = document.querySelector('.toggle-track');
+  const status = document.getElementById('toggleStatus');
+  const cb = document.getElementById('incluirAnalisis');
+  const isActive = track.classList.toggle('active');
+  cb.checked = isActive;
+  if (isActive) {
+    status.textContent = '✓ Se incluirá en el informe';
+    status.style.color = 'var(--pass)';
+  } else {
+    status.textContent = '✗ No se incluirá en el informe';
+    status.style.color = 'var(--ink-muted)';
+  }
+}
+
+// ─── LOCAL ANALYSIS ENGINE ───────────────────────────────────────────────────
+function generateLocalAnalysis(rows, total, pass, fail, nd, failsByParam, byEmpresa) {
+  const pctApto = total > 0 ? Math.round((pass / total) * 100) : 0;
+  const hasFails = Object.keys(failsByParam).length > 0;
+
+  // ── 1. DIAGNÓSTICO GENERAL
+  let diagnostico = '';
+  if (pctApto === 100) {
+    diagnostico = `<p>El lote analizado presenta un <strong>estado sanitario satisfactorio</strong>. El ${pctApto}% de las ${total} muestras evaluadas se encuentran dentro de los límites microbiológicos establecidos por el Código Alimentario Argentino (CAA). Este resultado indica que las condiciones de producción, manipulación y almacenamiento son adecuadas para el período analizado.</p>`;
+  } else if (pctApto >= 80) {
+    diagnostico = `<p>El lote analizado presenta un <strong>estado sanitario aceptable con observaciones</strong>. El ${pctApto}% de las ${total} muestras (${pass} aptas, ${fail} no aptas) se encuentran dentro de los límites del CAA. Se detectaron no conformidades que requieren atención y seguimiento.</p>`;
+  } else if (pctApto >= 50) {
+    diagnostico = `<p>El lote analizado presenta un <strong>estado sanitario comprometido</strong>. Solo el ${pctApto}% de las muestras (${pass} de ${total}) cumplen con los parámetros del CAA. Se detectaron ${fail} muestras no aptas que evidencian deficiencias en el control sanitario. Se requiere intervención inmediata.</p>`;
+  } else {
+    diagnostico = `<p>El lote analizado presenta un <strong>estado sanitario crítico</strong>. El ${100 - pctApto}% de las muestras (${fail} de ${total}) NO cumplen con los parámetros del CAA. Esta situación representa un riesgo significativo para la inocuidad alimentaria y requiere acciones urgentes e inmediatas.</p>`;
+  }
+
+  const empEntries = Object.entries(byEmpresa);
+  if (empEntries.length > 1) {
+    diagnostico += `<p style="margin-top:8px">Se analizaron muestras de <strong>${empEntries.length} establecimientos</strong>: `;
+    diagnostico += empEntries.map(([emp, d]) => {
+      const badge = d.fail === 0
+        ? `<span class="analysis-badge badge-ok">APTO</span>`
+        : (d.fail / d.total) >= 0.5
+          ? `<span class="analysis-badge badge-critical">CRÍTICO</span>`
+          : `<span class="analysis-badge badge-warning">CON OBSERVACIONES</span>`;
+      return `<strong>${emp}</strong> ${badge} (${d.total} muestra${d.total>1?'s':''}, ${d.fail} no apta${d.fail!==1?'s':''})`;
+    }).join(' · ') + '.</p>';
+  }
+
+  // ── 2. HALLAZGOS CRÍTICOS
+  const PARAM_INFO = {
+    'Aerobios Mesófilos': {
+      riesgo: 'Indicador general de higiene del proceso. Valores elevados indican deficiencias en temperatura de conservación, tiempo de procesamiento excesivo o contaminación ambiental.',
+      causa: 'Temperatura de almacenamiento inadecuada, higiene deficiente de equipos y superficies, o materia prima con carga microbiana elevada.',
+      caa: 'CAA Art. 149 y específicos por alimento'
+    },
+    'Staphylococcus Aureus': {
+      riesgo: 'Patógeno capaz de producir enterotoxinas termoestables. Su presencia indica contaminación por manipuladores (piel, nariz, garganta). Las toxinas pueden causar intoxicación alimentaria aguda con náuseas, vómitos y diarrea.',
+      causa: 'Manipuladores con lesiones infectadas o portadores asintomáticos, higiene de manos deficiente, tiempo-temperatura inadecuados post-cocción.',
+      caa: 'CAA Art. 149 — límite 100 UFC/g en alimentos listos para consumo'
+    },
+    'Coliformes Totales': {
+      riesgo: 'Indicador de higiene del proceso y posible contaminación fecal. Sugiere deficiencias en saneamiento de equipos, superficies o manipulación inadecuada.',
+      causa: 'Saneamiento insuficiente de equipos, agua de proceso contaminada, o contaminación cruzada post-proceso.',
+      caa: 'CAA Art. 149 — varía según categoría de alimento'
+    },
+    'Escherichia Coli': {
+      riesgo: 'Indicador directo de contaminación fecal. Cepas patógenas como E. coli O157:H7 pueden causar síndrome urémico hemolítico (SUH), especialmente grave en niños y adultos mayores.',
+      causa: 'Contaminación fecal de materias primas, agua de proceso no apta, o higiene deficiente del personal manipulador.',
+      caa: 'CAA Art. 149 — ausencia o máximo 10 UFC/g según categoría'
+    },
+    'Bacillus Cereus': {
+      riesgo: 'Bacteria formadora de esporas que produce toxinas emética (termoestable) y diarreica. Frecuente en cereales, arroz y lácteos. Puede sobrevivir a la cocción en forma de espora y multiplicarse durante el enfriamiento.',
+      causa: 'Enfriamiento lento de alimentos cocinados, almacenamiento en zona de peligro (10-50°C), contaminación de materias primas de origen vegetal.',
+      caa: 'CAA Art. 149 — límite 10³ UFC/g'
+    },
+    'Hongos y Levaduras': {
+      riesgo: 'Indicador de condiciones de humedad y temperatura inadecuadas. Algunos hongos producen micotoxinas (aflatoxinas, ocratoxinas) con acción carcinogénica y hepatotóxica. Implican deterioro organoléptico del producto.',
+      causa: 'Humedad relativa elevada en almacenamiento, temperatura inadecuada, envases dañados o mal cerrados, materia prima contaminada.',
+      caa: 'CAA Art. 149 — generalmente ≤1.000 UFC/g según categoría'
+    }
+  };
+
+  let hallazgos = '';
+  if (!hasFails) {
+    hallazgos = `<div class="action-item ok">✅ Todos los parámetros microbiológicos se encuentran dentro de los límites establecidos por el CAA. No se detectaron patógenos ni indicadores de contaminación por encima de los valores máximos permitidos.</div>`;
+  } else {
+    Object.entries(failsByParam).forEach(([param, casos]) => {
+      const info = PARAM_INFO[param] || { riesgo: '', causa: '', caa: 'CAA Art. 149' };
+      const maxVal = Math.max(...casos.map(c => Number(c.valor)));
+      const limite = casos[0].limite;
+      const exceso = Math.round(((maxVal - limite) / limite) * 100);
+      hallazgos += `
+        <div style="margin-bottom:16px; padding:14px; border:1px solid #fde8e6; border-left:4px solid var(--fail); border-radius:8px; background:white;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+            <strong style="font-size:0.92rem;">${param}</strong>
+            <span class="analysis-badge badge-critical">No Cumple CME-CAA</span>
+            <span style="font-size:0.72rem; color:var(--ink-muted); margin-left:auto;">${info.caa}</span>
+          </div>
+          <p style="margin-bottom:6px;"><strong>Casos:</strong> ${casos.length} muestra${casos.length>1?'s':''} — valor máximo: <strong>${maxVal.toLocaleString('es-AR')} UFC</strong> (límite: ${limite.toLocaleString('es-AR')} UFC · exceso: ${exceso}%)</p>
+          <p style="margin-bottom:6px;"><strong>Riesgo sanitario:</strong> ${info.riesgo}</p>
+          <p><strong>Causas probables:</strong> ${info.causa}</p>
+          <div style="margin-top:8px; padding:6px 10px; background:#fff8f8; border-radius:4px; font-size:0.76rem; color:var(--ink-muted);">
+            ${casos.map(c => `${c.empresa} | ${c.tipo} | ${c.fecha} → ${Number(c.valor).toLocaleString('es-AR')} UFC`).join(' &nbsp;·&nbsp; ')}
+          </div>
+        </div>`;
+    });
+  }
+
+  // ── 3. ACCIONES CORRECTIVAS
+  const accionesUrgentes = [];
+  if (failsByParam['Escherichia Coli']) {
+    accionesUrgentes.push('🚨 <strong>Retención y análisis de contramuestra</strong> de los lotes con E. coli positivo. Evaluar retiro del mercado si el producto ya fue distribuido. Notificar a la autoridad sanitaria competente.');
+    accionesUrgentes.push('🚿 <strong>Revisión inmediata del agua de proceso</strong>: solicitar análisis microbiológico conforme CAA Art. 982. Suspender uso hasta confirmar aptitud.');
+  }
+  if (failsByParam['Staphylococcus Aureus']) {
+    accionesUrgentes.push('🧤 <strong>Inspección sanitaria de manipuladores</strong>: relevar del área de producción al personal con lesiones cutáneas o síntomas respiratorios. Reforzar higiene de manos y uso de guantes/barbijo.');
+    accionesUrgentes.push('🌡️ <strong>Revisión de la cadena de temperatura</strong>: verificar registros post-cocción. Ningún alimento listo debe permanecer entre 10-60°C por más de 2 horas.');
+  }
+  if (failsByParam['Coliformes Totales'] || failsByParam['Aerobios Mesófilos']) {
+    accionesUrgentes.push('🧹 <strong>Limpieza y desinfección profunda</strong> de equipos, superficies y utensilios. Verificar efectividad con hisopados post-limpieza antes de retomar producción.');
+  }
+  if (failsByParam['Bacillus Cereus']) {
+    accionesUrgentes.push('❄️ <strong>Revisión del protocolo de enfriamiento</strong>: los productos cocinados deben pasar de 60°C a menos de 10°C en menos de 2 horas. Verificar capacidad frigorífica disponible.');
+  }
+  if (failsByParam['Hongos y Levaduras']) {
+    accionesUrgentes.push('💧 <strong>Inspección de almacenamiento</strong>: medir humedad relativa (debe ser <70% en almacenes secos). Verificar hermeticidad de envases y presencia de condensación.');
+  }
+
+  let acciones = '';
+  if (accionesUrgentes.length > 0) {
+    acciones = accionesUrgentes.map(a => `<div class="action-item urgent">${a}</div>`).join('');
+  } else {
+    acciones = `<div class="action-item ok">✅ No se requieren acciones correctivas urgentes. El lote se encuentra dentro de los parámetros establecidos por el CAA.</div>`;
+  }
+
+  // ── 4. RECOMENDACIONES PREVENTIVAS
+  const prevItems = [
+    hasFails ? '<strong>Verificar y actualizar el plan HACCP</strong> o programa de autocontrol para incorporar los hallazgos de este análisis como puntos críticos de control.' : '<strong>Mantener las condiciones actuales</strong> de producción e higiene que permiten los buenos resultados obtenidos.',
+    '<strong>Continuar con el programa de muestreo regular</strong> según el plan HACCP establecido. Se recomienda aumentar la frecuencia en los establecimientos con no conformidades.',
+    '<strong>Documentar y archivar</strong> los resultados para análisis de tendencias. Comparar con resultados anteriores para detectar patrones.',
+    '<strong>Capacitación periódica del personal</strong> en Buenas Prácticas de Manufactura (BPM), higiene personal y manejo seguro de alimentos (CAA Cap. II).',
+    '<strong>Revisión y actualización del programa de POES</strong>: verificar que los procedimientos y productos de limpieza/desinfección sean adecuados para los microorganismos detectados.',
+    '<strong>Control de proveedores</strong>: solicitar certificados de análisis microbiológicos de materias primas, especialmente para los parámetros con no conformidades.'
+  ];
+
+  return `
+    <div class="analysis-section">
+      <h3>📊 Diagnóstico general</h3>
+      ${diagnostico}
+    </div>
+    <div class="analysis-section">
+      <h3>⚠️ Hallazgos críticos</h3>
+      ${hallazgos}
+    </div>
+    <div class="analysis-section">
+      <h3>🔧 Acciones correctivas inmediatas</h3>
+      ${acciones}
+    </div>
+    <div class="analysis-section">
+      <h3>✅ Recomendaciones preventivas</h3>
+      <ul>${prevItems.map(i => `<li>${i}</li>`).join('')}</ul>
+    </div>
+  `;
 }
 
 function getCounter() {
