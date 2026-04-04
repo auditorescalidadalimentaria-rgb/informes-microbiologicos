@@ -1139,9 +1139,10 @@ function buildReport() {
   // Signatures — unique analysts
   const analysts = [...new Set(filteredRows.map(r => r.analista).filter(Boolean))];
   // Signature matching
-  const FIRMA_NOMBRES = ['fernando vera', 'vera', 'adrian vera', 'adrián vera', 'adrián fernando vera'];
   function esFirmaFV(nombre) {
-    return FIRMA_NOMBRES.some(n => nombre.toLowerCase().includes(n));
+    if (!nombre) return false;
+    const n = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return n.includes('vera') || n.includes('fernando');
   }
 
   let sigHTML = '';
@@ -1246,6 +1247,9 @@ function generateReport(type) {
   `;
 
   const repContainer = document.getElementById('reportContainer');
+  const repContainer = document.getElementById('reportContainer');
+  repContainer.style.display = 'block';
+
   const reportHTML = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1259,6 +1263,7 @@ ${document.getElementById('reportPage').outerHTML}
 </html>`;
 
   if (type === 'pdf') {
+    repContainer.style.display = 'none';
     // Open in new window and trigger print dialog
     const win = window.open('', '_blank');
     win.document.write(reportHTML);
