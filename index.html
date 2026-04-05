@@ -125,6 +125,7 @@ input[readonly]{background:var(--paper-warm);cursor:default;font-family:'DM Mono
       <div class="form-group"><label>Fecha hasta</label><input type="date" id="fechaHasta"></div>
       <div class="form-group"><label>Tipo de muestra</label><select id="tipoMuestra"><option value="">Todos</option></select></div>
       <div class="form-group full"><label>Muestra perteneciente a</label><select id="muestraPertenece"><option value="">Todas</option></select></div>
+      <div class="form-group full"><label>Local / Franquicia / Servicio</label><select id="localFilter"><option value="">Todos</option></select></div>
     </div>
     <button class="btn btn-light" style="margin-top:12px" onclick="applyFilters()">Aplicar filtros</button>
   </div>
@@ -134,7 +135,7 @@ input[readonly]{background:var(--paper-warm);cursor:default;font-family:'DM Mono
     <div class="results-wrap">
       <table id="dataTable">
         <thead><tr>
-          <th>Fecha</th><th>Empresa/Local</th><th>Tipo</th>
+          <th>Fecha</th><th>Empresa/Local</th><th>Local/Franquicia</th><th>Tipo</th>
           <th>Aerobios Mes.</th><th>S. Aureus</th><th>Col. Totales</th>
           <th>E. Coli</th><th>B. Cereus</th><th>H. y Levad.</th><th>Estado</th>
         </tr></thead>
@@ -213,7 +214,7 @@ input[readonly]{background:var(--paper-warm);cursor:default;font-family:'DM Mono
 .rpt-title-block{background:#1a1a2e;color:#fff;padding:9px 15px;border-radius:6px;margin-bottom:13px}
 .rpt-title-block h2{font-family:'DM Serif Display',serif;font-size:1.15rem;margin-bottom:2px}
 .rpt-title-block p{font-size:.72rem;opacity:.7}
-.rpt-info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:11px}
+.rpt-info-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:11px}
 .rpt-info-cell{border:1px solid #d8d4c8;border-radius:5px;padding:6px 10px;background:#f8f7f2}
 .rpt-info-cell .lbl{font-size:.6rem;text-transform:uppercase;color:#7a7a9a;font-weight:500;margin-bottom:2px}
 .rpt-info-cell .val{font-size:.8rem;font-weight:500;color:#1a1a2e}
@@ -272,19 +273,20 @@ function parseDate(s){if(!s)return null;var m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\
 function fmtDate(s){var d=parseDate(s);if(!d||isNaN(d))return s||'';return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});}
 
 function normalizeRow(r){var keys=Object.keys(r);function get(){for(var i=0;i<arguments.length;i++){var p=arguments[i];var k=keys.find(function(k){return k.toLowerCase().indexOf(p.toLowerCase())!==-1;});if(k)return(r[k]||'').trim();}return '';}
-return{fecha:get('fecha'),empresa:get('perteniciente','perteneciente','empresa'),tipo:get('tipo de muestra','tipo'),aerobios:get('aerobios'),aureus:get('staphylococcus','aureus'),coliformes:get('coliformes totales','coliformes'),ecoli:get('escherichia','coli'),bacillus:get('bacillus'),hongos:get('hongos'),obs:get('observaciones'),analista:get('analisis realizado','analista','realizado por')};}
+return{fecha:get('fecha'),empresa:get('perteniciente','perteneciente','empresa'),local:get('local/franquicia','franquicia','servicio','local'),tipo:get('tipo de muestra','tipo'),aerobios:get('aerobios'),aureus:get('staphylococcus','aureus'),coliformes:get('coliformes totales','coliformes'),ecoli:get('escherichia','coli'),bacillus:get('bacillus'),hongos:get('hongos'),obs:get('observaciones'),analista:get('analisis realizado','analista','realizado por')};}
 
 function loadCSV(){var url=document.getElementById('csvUrl').value.trim();if(!url){showStatus('Ingresa la URL del CSV.','err');return;}showStatus('Cargando datos...','info');Papa.parse(url,{download:true,header:true,skipEmptyLines:true,complete:function(res){if(!res.data.length){showStatus('No se encontraron datos.','err');return;}allRows=res.data.map(normalizeRow);filteredRows=allRows.slice();populateFilters();renderTable(filteredRows);showStatus('Cargados '+allRows.length+' registros correctamente.','ok');document.getElementById('previewCard').style.display='block';},error:function(err){showStatus('Error: '+err.message,'err');}});}
 
 function showStatus(msg,type){var el=document.getElementById('statusMsg');el.textContent=msg;el.className='status '+(type==='ok'?'s-ok':type==='err'?'s-err':'s-info');el.style.display='block';}
 
-function populateFilters(){var tipos=[],emps=[];allRows.forEach(function(r){if(r.tipo&&tipos.indexOf(r.tipo)===-1)tipos.push(r.tipo);if(r.empresa&&emps.indexOf(r.empresa)===-1)emps.push(r.empresa);});tipos.sort();emps.sort();var sT=document.getElementById('tipoMuestra');sT.innerHTML='<option value="">Todos</option>';tipos.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sT.appendChild(o);});var sE=document.getElementById('muestraPertenece');sE.innerHTML='<option value="">Todas</option>';emps.forEach(function(e){var o=document.createElement('option');o.value=e;o.textContent=e;sE.appendChild(o);});}
+function populateFilters(){var tipos=[],emps=[];allRows.forEach(function(r){if(r.tipo&&tipos.indexOf(r.tipo)===-1)tipos.push(r.tipo);if(r.empresa&&emps.indexOf(r.empresa)===-1)emps.push(r.empresa);});tipos.sort();emps.sort();var sT=document.getElementById('tipoMuestra');sT.innerHTML='<option value="">Todos</option>';tipos.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sT.appendChild(o);});var sE=document.getElementById('muestraPertenece');sE.innerHTML='<option value="">Todas</option>';emps.forEach(function(e){var o=document.createElement('option');o.value=e;o.textContent=e;sE.appendChild(o);});
+  var locals=[];allRows.forEach(function(r){if(r.local&&locals.indexOf(r.local)===-1)locals.push(r.local);});locals.sort();var sL=document.getElementById('localFilter');sL.innerHTML='<option value="">Todos</option>';locals.forEach(function(l){var o=document.createElement('option');o.value=l;o.textContent=l;sL.appendChild(o);});}
 
-function applyFilters(){var desde=document.getElementById('fechaDesde').value,hasta=document.getElementById('fechaHasta').value,tipo=document.getElementById('tipoMuestra').value,emp=document.getElementById('muestraPertenece').value;filteredRows=allRows.filter(function(r){var d=parseDate(r.fecha);if(desde&&d&&d<new Date(desde))return false;if(hasta&&d&&d>new Date(hasta+'T23:59:59'))return false;if(tipo&&r.tipo!==tipo)return false;if(emp&&r.empresa!==emp)return false;return true;});renderTable(filteredRows);}
+function applyFilters(){var desde=document.getElementById('fechaDesde').value,hasta=document.getElementById('fechaHasta').value,tipo=document.getElementById('tipoMuestra').value,emp=document.getElementById('muestraPertenece').value;filteredRows=allRows.filter(function(r){var d=parseDate(r.fecha);if(desde&&d&&d<new Date(desde))return false;if(hasta&&d&&d>new Date(hasta+'T23:59:59'))return false;if(tipo&&r.tipo!==tipo)return false;if(emp&&r.empresa!==emp)return false;var loc=document.getElementById('localFilter').value;if(loc&&r.local!==loc)return false;return true;});renderTable(filteredRows);}
 
 function chipHTML(v,k){if(v===''||v===null||v===undefined||isNaN(Number(v)))return '<span class="chip c-nd">N/D</span>';var st=evalParam(v,k);return '<span class="chip '+(st==='pass'?'c-pass':'c-fail')+'">'+Number(v).toLocaleString('es-AR')+'</span>';}
 
-function renderTable(rows){var tbody=document.getElementById('tableBody');tbody.innerHTML='';document.getElementById('prevBadge').textContent=rows.length+' REGISTROS';document.getElementById('recCount').textContent=rows.length+' registros seleccionados';rows.forEach(function(r){var st=overallStatus(r);var stL=st==='pass'?'<span class="chip c-pass">APTO</span>':st==='fail'?'<span class="chip c-fail" style="font-size:.6rem;padding:2px 5px">No Cumple CME-CAA</span>':'<span class="chip c-nd">N/D</span>';var tr=document.createElement('tr');tr.innerHTML='<td>'+fmtDate(r.fecha)+'</td><td>'+(r.empresa||'&mdash;')+'</td><td>'+(r.tipo||'&mdash;')+'</td><td>'+chipHTML(r.aerobios,'aerobios')+'</td><td>'+chipHTML(r.aureus,'aureus')+'</td><td>'+chipHTML(r.coliformes,'coliformes')+'</td><td>'+chipHTML(r.ecoli,'ecoli')+'</td><td>'+chipHTML(r.bacillus,'bacillus')+'</td><td>'+chipHTML(r.hongos,'hongos')+'</td><td>'+stL+'</td>';tbody.appendChild(tr);});}
+function renderTable(rows){var tbody=document.getElementById('tableBody');tbody.innerHTML='';document.getElementById('prevBadge').textContent=rows.length+' REGISTROS';document.getElementById('recCount').textContent=rows.length+' registros seleccionados';rows.forEach(function(r){var st=overallStatus(r);var stL=st==='pass'?'<span class="chip c-pass">APTO</span>':st==='fail'?'<span class="chip c-fail" style="font-size:.6rem;padding:2px 5px">No Cumple CME-CAA</span>':'<span class="chip c-nd">N/D</span>';var tr=document.createElement('tr');tr.innerHTML='<td>'+fmtDate(r.fecha)+'</td><td>'+(r.empresa||'&mdash;')+'</td><td>'+(r.local||'&mdash;')+'</td><td>'+(r.tipo||'&mdash;')+'</td><td>'+chipHTML(r.aerobios,'aerobios')+'</td><td>'+chipHTML(r.aureus,'aureus')+'</td><td>'+chipHTML(r.coliformes,'coliformes')+'</td><td>'+chipHTML(r.ecoli,'ecoli')+'</td><td>'+chipHTML(r.bacillus,'bacillus')+'</td><td>'+chipHTML(r.hongos,'hongos')+'</td><td>'+stL+'</td>';tbody.appendChild(tr);});}
 
 function getCounter(){try{return parseInt(localStorage.getItem('inf_counter')||'1');}catch(e){return 1;}}
 function setCounter(n){try{localStorage.setItem('inf_counter',String(n));}catch(e){}}
@@ -305,16 +307,17 @@ function buildReport(){
   var sub='Per\u00edodo: '+(desde||hasta?(desde?fmtDate(desde):'&mdash;')+' al '+(hasta?fmtDate(hasta):'&mdash;'):'todos los registros');
   document.getElementById('rptSubtitle').innerHTML=sub;
   var tipo=document.getElementById('tipoMuestra').value,emp=document.getElementById('muestraPertenece').value;
-  document.getElementById('rptInfoGrid').innerHTML='<div class="rpt-info-cell"><div class="lbl">Empresa/Local</div><div class="val">'+(emp||'Todos')+'</div></div><div class="rpt-info-cell"><div class="lbl">Tipo de muestra</div><div class="val">'+(tipo||'Todos')+'</div></div><div class="rpt-info-cell"><div class="lbl">Total muestras</div><div class="val">'+filteredRows.length+'</div></div>';
+  var locVal=document.getElementById('localFilter').value;
+  document.getElementById('rptInfoGrid').innerHTML='<div class="rpt-info-cell"><div class="lbl">Empresa/Local</div><div class="val">'+(emp||'Todos')+'</div></div><div class="rpt-info-cell"><div class="lbl">Local/Franquicia/Servicio</div><div class="val">'+(locVal||'Todos')+'</div></div><div class="rpt-info-cell"><div class="lbl">Tipo de muestra</div><div class="val">'+(tipo||'Todos')+'</div></div><div class="rpt-info-cell"><div class="lbl">Total muestras</div><div class="val">'+filteredRows.length+'</div></div>';
   var total=filteredRows.length,pass=filteredRows.filter(function(r){return overallStatus(r)==='pass';}).length,fail=filteredRows.filter(function(r){return overallStatus(r)==='fail';}).length;
   document.getElementById('rptConformity').innerHTML='<div class="conf-box conf-total"><div class="num">'+total+'</div><div class="lbl">Analizadas</div></div><div class="conf-box conf-pass"><div class="num">'+pass+'</div><div class="lbl">Aptas</div></div><div class="conf-box conf-fail"><div class="num">'+fail+'</div><div class="lbl">No aptas</div></div>';
   var params=[{k:'aerobios',l:'Aerobios<br>Mes.(UFC)'},{k:'aureus',l:'S.Aureus<br>(UFC)'},{k:'coliformes',l:'Col.Tot.<br>(UFC)'},{k:'ecoli',l:'E.Coli<br>(UFC)'},{k:'bacillus',l:'B.Cereus<br>(UFC)'},{k:'hongos',l:'H.Lev.<br>(UFC)'}];
-  var tbl='<table class="rpt-table"><thead><tr><th>Empresa/Local</th><th>Fecha</th><th>Tipo</th>'+params.map(function(p){return '<th>'+p.l+'</th>';}).join('')+'<th>Resultado</th></tr></thead><tbody>';
+  var tbl='<table class="rpt-table"><thead><tr><th>Empresa/Local</th><th>Local/Franquicia</th><th>Fecha</th><th>Tipo</th>'+params.map(function(p){return '<th>'+p.l+'</th>';}).join('')+'<th>Resultado</th></tr></thead><tbody>';
   filteredRows.forEach(function(r){
     var st=overallStatus(r);
     var stc=st==='pass'?'<span class="rc rc-pass">APTO</span>':st==='fail'?'<span class="rc rc-fail" style="font-size:.55rem;padding:1px 4px">No Cumple CME-CAA</span>':'<span class="rc rc-nd">N/D</span>';
-    tbl+='<tr><td>'+(r.empresa||'&mdash;')+'</td><td>'+fmtDate(r.fecha)+'</td><td>'+(r.tipo||'&mdash;')+'</td>'+params.map(function(p){var v=r[p.k];if(v===''||v===null||v===undefined||isNaN(Number(v)))return '<td><span class="rc rc-nd">N/D</span></td>';return '<td><span class="rc '+(evalParam(v,p.k)==='pass'?'rc-pass':'rc-fail')+'">'+Number(v).toLocaleString('es-AR')+'</span></td>';}).join('')+'<td>'+stc+'</td></tr>';
-    if(r.obs)tbl+='<tr><td colspan="10" style="font-size:.65rem;color:#7a7a9a;padding:3px 7px"><strong>Obs:</strong> '+r.obs+'</td></tr>';
+    tbl+='<tr><td>'+(r.empresa||'&mdash;')+'</td><td>'+(r.local||'&mdash;')+'</td><td>'+fmtDate(r.fecha)+'</td><td>'+(r.tipo||'&mdash;')+'</td>'+params.map(function(p){var v=r[p.k];if(v===''||v===null||v===undefined||isNaN(Number(v)))return '<td><span class="rc rc-nd">N/D</span></td>';return '<td><span class="rc '+(evalParam(v,p.k)==='pass'?'rc-pass':'rc-fail')+'">'+Number(v).toLocaleString('es-AR')+'</span></td>';}).join('')+'<td>'+stc+'</td></tr>';
+    if(r.obs)tbl+='<tr><td colspan="11" style="font-size:.65rem;color:#7a7a9a;padding:3px 7px"><strong>Obs:</strong> '+r.obs+'</td></tr>';
   });
   tbl+='</tbody></table>';
   document.getElementById('rptContent').innerHTML=tbl;
